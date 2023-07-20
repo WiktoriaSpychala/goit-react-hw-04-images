@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import css from './App.module.css';
 
 import { Searchbar } from './Searchbar/Searchbar';
@@ -9,99 +9,91 @@ import { Loader } from './Loader/Loader';
 
 
 
-export class App extends Component {
-  state = {
-    page: 1,
-    images: [],
-    imageName: '',
-    largeImageURL: '',
-    searchTotal: null,
-    loading: false,
-    error: null,
-  };
 
-  handlerFormSubmit = imageName => {
-    if (imageName !== this.state.imageName) {
-      this.setState({ imageName, page: 1 });
-      this.setState({ images: [] });
-      return;
+export const App = () => {
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [imageName, setImageName] = useState('');
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [searchTotal, setSearchTotal] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const PER_PAGE = 12;
+  const key = 'key=35040832-5e7ee7e93ffcaf004ab10bdd7';
+
+  const handlerFormSubmit = newImageName => {
+    if (imageName !== newImageName) {
+      setImageName(newImageName);
+      setPage(1);
+      setImages([]);
     }
-    if (imageName === this.state.imageName) {
+    if (imageName === newImageName) {
       alert('There is the same name');
     }
-    else {
-      alert('There is no images with this name');
-    }
   };
 
-  hendlerLoadMoreClick = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const hendlerLoadMoreClick = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  handleOpen = url => {
-    this.setState({
-      largeImageURL: url,
-    });
+  const handleOpen = url => {
+    setLargeImageURL(url)
   };
 
-  handleClose = () => {
-    this.setState({
-      largeImageURL: '',
-    });
+  const handleClose = () => {
+    setLargeImageURL('');
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevName = prevState.imageName;
-    const prevPage = prevState.page;
-    const { imageName, page } = this.state;
-    const PER_PAGE = 12;
-    const key = 'key=35040832-5e7ee7e93ffcaf004ab10bdd7';
+ useEffect(() => {
+   if (imageName === '') {
+     return;
+   }
+   setLoading(true);
+   const fetchPhotos = () => {
+     if (!imageName) {
+       return;
+     }
+     return fetch(
+       `https://pixabay.com/api/?q=${imageName}&page=${page}&${key}&image_type=photo&orientation=horizontal&per_page=${PER_PAGE}`
+     )
+       .then(res => {
+         if (res.ok) {
+           return res.json();
+         }
+         return Promise.reject(new Error());
+       })
+       .then(images => {
+         if (!images.total) {
+           alert('There is no images with this name');
+         }
+         return images;
+       })
+       .catch(error => setError(error))
+       .finally(() => setLoading(false));
+   };
 
-    if (imageName !== prevName) {
-      this.setState({ images: [] });
-    }
-    if (prevName !== imageName || prevPage !== page) {
-      this.setState({ loading: true });
+   fetchPhotos().then(images => {
+     setImages(prevImages => [...prevImages, ...images.hits]);
+     setSearchTotal(images.total);
+   });
+ }, [imageName, page, error]);
 
-      fetch(
-        `https://pixabay.com/api/?q=${imageName}&page=${page}&${key}&image_type=images&orientation=horizontal&per_page=${PER_PAGE}`
-      )
-        .then(res => {
-          if (res.ok) {
-            return res.json();
-          }
-          return Promise.reject(new Error());
-        })
-        .then(images =>
-          this.setState(prevState => ({
-            images: [...prevState.images, ...images.hits],
-            searchTotal: images.total,
-          }))
-        )
-        .catch(error => this.setState({ error }))
-        .finally(this.setState({ loading: false }));
-    }
-  }
-
-  render() {
-    const { page, images, largeImageURL, searchTotal, loading } =
-      this.state;
     return (
       <div className={css.app}>
-        <Searchbar onSubmit={this.handlerFormSubmit} page={page} />
+        <Searchbar onSubmit={handlerFormSubmit} page={page} />
 
         {images && (
-          <ImageGallery imageName={images} onClick={this.handleOpen} />
+          <ImageGallery imageName={images} onClick={handleOpen} />
         )}
 
         {largeImageURL && (
-          <Modal closeModal={this.handleClose} url={largeImageURL} />
+          <Modal closeModal={handleClose} url={largeImageURL} />
         )}
         {loading && <Loader />}
         {!loading && searchTotal > 12 && (
-          <Button onClick={this.hendlerLoadMoreClick} />
+          <Button onClick={hendlerLoadMoreClick} />
         )}
       </div>
     );
   }
-}
